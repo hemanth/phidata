@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional, Dict, Any, Union, List, TYPE_CHECKING
 
 from phi.app.base import AppBase
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 class DockerApp(AppBase):
     # -*- Workspace Configuration
     # Path to the workspace directory inside the container
-    workspace_dir_container_path: str = "/usr/local/app"
+    workspace_dir_container_path: str = "/app"
     # Mount the workspace directory from host machine to the container
     mount_workspace: bool = False
 
@@ -35,6 +36,10 @@ class DockerApp(AppBase):
     resources_dir: str = "workspace/resources"
     # Path to mount the resources_dir
     resources_dir_container_path: str = "/mnt/resources"
+
+    # -*- Phi Volume
+    # Mount ~/.phi directory from host machine to the container
+    mount_phi_config: bool = True
 
     # -*- Container Configuration
     container_name: Optional[str] = None
@@ -151,7 +156,6 @@ class DockerApp(AppBase):
             STORAGE_DIR_ENV_VAR,
             WORKFLOWS_DIR_ENV_VAR,
             WORKSPACE_DIR_ENV_VAR,
-            WORKSPACE_HASH_ENV_VAR,
             WORKSPACE_ID_ENV_VAR,
             WORKSPACE_ROOT_ENV_VAR,
         )
@@ -179,8 +183,6 @@ class DockerApp(AppBase):
             if container_context.workspace_schema is not None:
                 if container_context.workspace_schema.id_workspace is not None:
                     container_env[WORKSPACE_ID_ENV_VAR] = str(container_context.workspace_schema.id_workspace) or ""
-                if container_context.workspace_schema.ws_hash is not None:
-                    container_env[WORKSPACE_HASH_ENV_VAR] = container_context.workspace_schema.ws_hash
         except Exception:
             pass
 
@@ -265,6 +267,17 @@ class DockerApp(AppBase):
             logger.debug(f"      to: {self.resources_dir_container_path}")
             container_volumes[resources_dir_path] = {
                 "bind": self.resources_dir_container_path,
+                "mode": "ro",
+            }
+
+        # Add ~/.phi as a volume
+        if self.mount_phi_config:
+            phi_config_host_path = str(Path.home().joinpath(".phi"))
+            phi_config_container_path = f"{self.workspace_dir_container_path}/.phi"
+            logger.debug(f"Mounting: {phi_config_host_path}")
+            logger.debug(f"      to: {phi_config_container_path}")
+            container_volumes[phi_config_host_path] = {
+                "bind": phi_config_container_path,
                 "mode": "ro",
             }
 
